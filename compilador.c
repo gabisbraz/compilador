@@ -617,10 +617,6 @@ int main(int argc, char *argv[]) {
     }
 
     FILE *arquivo = abrir_arquivo(argv[1]);
-    if (!arquivo) {
-        printf("Erro ao abrir o arquivo: %s\n", "teste1.pas");
-        return 1;
-    }
 
     ler_arquivo(arquivo);
 
