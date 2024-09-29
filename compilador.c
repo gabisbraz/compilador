@@ -3,11 +3,16 @@
 #include <ctype.h>
 #include <stdlib.h>
 
-#define TAMANHO_MAXIMO_BUFFER 200
+// Lista de palavras reservadas
+const char *palavrasReservadas[] = {
+    "program", "begin", "end", 
+    "if", "elif", "for", 
+    "read", "write", "set", 
+    "to", "of", "integer", 
+    "boolean"
+};
 
-char bufferFonte[TAMANHO_MAXIMO_BUFFER]; 
-char *ponteiroAtualChar;
-
+// Enum para os diferentes tipos de elementos que podem ser identificado
 typedef enum {
     elem_var,
     elem_num,
@@ -25,6 +30,7 @@ typedef enum {
     elem_end,       
 } TipoElemento;
 
+// Impressão correspondente para cada tipo de elemento
 const char *print_elemento[] = {
     "identificador",
     "numero",
@@ -42,15 +48,17 @@ const char *print_elemento[] = {
     "end",
 };
 
-const char *palavrasReservadas[] = {"program", "begin", "end", "if", "elif", "for", "read", "write", "set", "to", "of", "integer", "boolean"};
-
+// Estrutura que representa um elemento analisado
 typedef struct {
-    TipoElemento tipo;
-    int linha;
-    float valorNumerico;
+    TipoElemento tipo;      
+    int linha;              // Linha onde o elemento foi encontrado
+    float valorNumerico;   
     char identificador[16];
 } AnalisaElemento;
-int contadorLinha = 1;
+
+int contadorLinha = 1; // Contador de linhas inicializado em 1
+char bufferFonte[600]; // Buffer para armazenar o código fonte
+char *ponteiroAtualChar; // Ponteiro para percorrer o buffer
 
 AnalisaElemento prox_elemento;
 AnalisaElemento identifica_num();
@@ -72,6 +80,9 @@ void analisa_comando_composto();
 void analisa_declaracao_variaveis();
 void raise_erro(const char *esperado, const char *encontrado, int linha);
 
+/**
+ * Exibe os comentários encontrados no código, enquanto houver.
+ */
 void exibir_comentarios() {
     while (prox_elemento.tipo == elem_coment) {
         printf("# %d: comentario\n", prox_elemento.linha);  // Exibe o comentário
@@ -79,6 +90,9 @@ void exibir_comentarios() {
     }
 }
 
+/**
+ * Exibe o elemento atual sendo analisado, com base no seu tipo.
+ */
 void exibir_elemento() {
     if (prox_elemento.tipo == elem_var) {
         printf("# %d: %s | %s\n", prox_elemento.linha, print_elemento[prox_elemento.tipo], prox_elemento.identificador);
@@ -91,6 +105,11 @@ void exibir_elemento() {
     }
 }
 
+/**
+ * Consome o elemento esperado, exibindo-o e verificando se está correto.
+ * 
+ * @param esperado Tipo do elemento que é esperado.
+ */
 void consome_elemento(int esperado) {
     exibir_comentarios(); // Exibe comentários antes do elemento esperado
 
@@ -103,6 +122,9 @@ void consome_elemento(int esperado) {
     }
 }
 
+/**
+ * Inicia a análise do programa, consumindo os elementos iniciais.
+ */
 void analisa_programa() {
     consome_elemento(elem_reservada);  // "program"
     consome_elemento(elem_var);      // Nome do programa
@@ -111,11 +133,17 @@ void analisa_programa() {
     consome_elemento(elem_ponto);        // Consome o ponto final (.)
 }
 
+/**
+ * Analisa o bloco de código, incluindo variáveis e comandos.
+ */
 void analisa_bloco() {
     analisa_declaracao_variaveis();
     analisa_comando_composto();
 }
 
+/**
+ * Analisa a declaração de variáveis, que pode incluir múltiplas variáveis.
+ */
 void analisa_declaracao_variaveis() {
     while (prox_elemento.tipo == elem_reservada && 
           (strcmp(prox_elemento.identificador, "integer") == 0 || strcmp(prox_elemento.identificador, "boolean") == 0)) {
@@ -129,6 +157,9 @@ void analisa_declaracao_variaveis() {
     }
 }
 
+/**
+ * Analisa um bloco de comandos, que começa com "begin" e termina com "end".
+ */
 void analisa_comando_composto() {
     consome_elemento(elem_reservada);  // "begin"
     analisa_comando();
@@ -139,6 +170,9 @@ void analisa_comando_composto() {
     consome_elemento(elem_reservada);  // "end"
 }
 
+/**
+ * Analisa um comando, verificando seu tipo.
+ */
 void analisa_comando() {
     if (strcmp(prox_elemento.identificador, "set") == 0) {
         consome_elemento(elem_reservada);  // "set"
@@ -156,6 +190,9 @@ void analisa_comando() {
     }
 }
 
+/**
+ * Analisa um comando "if", incluindo sua condição e bloco de comandos.
+ */
 void analisa_comando_if() {
     consome_elemento(elem_reservada);  // "if"
     analisa_expressao();                     // <expressao>
@@ -167,6 +204,9 @@ void analisa_comando_if() {
     }
 }
 
+/**
+ * Analisa um comando "for", incluindo o iterador e os limites.
+ */
 void analisa_comando_for() {
     consome_elemento(elem_reservada);  // "for"
     consome_elemento(elem_var);      // Identificador
@@ -178,6 +218,9 @@ void analisa_comando_for() {
     analisa_comando();                       // <comando>
 }
 
+/**
+ * Analisa um comando "read", incluindo a leitura de múltiplas variáveis.
+ */
 void analisa_comando_read() {
     consome_elemento(elem_reservada);  // "read"
     consome_elemento(elem_abertura);           // (
@@ -189,6 +232,9 @@ void analisa_comando_read() {
     consome_elemento(elem_fechamento);          // )
 }
 
+/**
+ * Analisa um comando "write", incluindo a impressão de múltiplas expressões.
+ */
 void analisa_comando_write() {
     consome_elemento(elem_reservada);  // "write"
     consome_elemento(elem_abertura);           // (
@@ -200,15 +246,30 @@ void analisa_comando_write() {
     consome_elemento(elem_fechamento);          // )
 }
 
+/**
+ * Analisa uma expressão, que pode ser uma operação ou um identificador/número.
+ */
 void analisa_expressao() {
     // Implementação simplificada de análise de expressão
     consome_elemento(elem_var);  // Exemplo de elemento esperado
 }
 
+/**
+ * Gera um erro, exibindo o que era esperado e o que foi encontrado.
+ * 
+ * @param esperado O que se esperava encontrar.
+ * @param encontrado O que foi realmente encontrado.
+ * @param linha A linha em que o erro ocorreu.
+ */
 void raise_erro(const char *esperado, const char *encontrado, int linha) {
     printf("Erro sintatico na linha %d: esperado '%s', encontrado '%s'.\n", linha, esperado, encontrado);
 }
 
+/**
+ * Identifica o próximo elemento e atualiza o estado.
+ * 
+ * @return O próximo elemento identificado.
+ */
 void ignorar_espacos() {
     while (*ponteiroAtualChar == ' ' || *ponteiroAtualChar == '\t' || 
            *ponteiroAtualChar == '\n' || *ponteiroAtualChar == '\r') {
@@ -219,6 +280,11 @@ void ignorar_espacos() {
     }
 }
 
+/**
+ * Identifica e retorna um número.
+ * 
+ * @return Um objeto AnalisaElemento representando um número.
+ */
 int verifica_fim_arquivo(AnalisaElemento* elemento) {
     if (*ponteiroAtualChar == '\0') {
         elemento->tipo = elem_end;
@@ -227,6 +293,11 @@ int verifica_fim_arquivo(AnalisaElemento* elemento) {
     return 0; // Não é o fim do arquivo
 }
 
+/**
+ * Identifica e retorna um símbolo.
+ * 
+ * @return Um objeto AnalisaElemento representando um símbolo.
+ */
 AnalisaElemento identifica_elemento() {
     AnalisaElemento elemento;
     elemento.linha = contadorLinha;
@@ -243,6 +314,11 @@ AnalisaElemento identifica_elemento() {
     return identifica_simb(); // Identifica operadores ou símbolos
 }
 
+/**
+ * Identifica o próximo elemento e atualiza o estado.
+ * 
+ * @return O próximo elemento identificado.
+ */
 AnalisaElemento obtem_proximo_elemento() {
     AnalisaElemento elemento;
     ignorar_espacos(); // Ignora espaços em branco
@@ -254,6 +330,11 @@ AnalisaElemento obtem_proximo_elemento() {
     return identifica_elemento(); // Identifica o próximo elemento
 }
 
+/**
+ * Identifica e retorna uma variável.
+ * 
+ * @return Um objeto AnalisaElemento representando uma variável.
+ */
 AnalisaElemento identifica_var() {
     AnalisaElemento elemento;
     elemento.tipo = elem_var;
@@ -281,6 +362,11 @@ AnalisaElemento identifica_var() {
     return elemento;
 }
 
+/**
+ * Identifica e retorna um número.
+ * 
+ * @return Um objeto AnalisaElemento representando um número.
+ */
 AnalisaElemento identifica_num() {
     AnalisaElemento elemento;
     elemento.tipo = elem_num;
@@ -300,10 +386,20 @@ AnalisaElemento identifica_num() {
     return elemento;
 }
 
+/**
+ * Identifica e retorna um símbolo.
+ * 
+ * @return Um objeto AnalisaElemento representando um símbolo.
+ */
 void iniciar_elemento_simb(AnalisaElemento* elemento) {
     elemento->linha = contadorLinha;
 }
 
+/**
+ * Processa um símbolo unário (como ponto e vírgula).
+ * 
+ * @param elemento O ponteiro para o elemento a ser atualizado.
+ */
 void processar_simbolo_unario(AnalisaElemento* elemento) {
     if (*ponteiroAtualChar == ';') {
         elemento->tipo = elem_ponto_virgula;
@@ -321,6 +417,11 @@ void processar_simbolo_unario(AnalisaElemento* elemento) {
     ponteiroAtualChar++; // Avança o ponteiro
 }
 
+/**
+ * Processa o símbolo de dois pontos, identificando se é um operador relacional.
+ * 
+ * @param elemento O ponteiro para o elemento a ser atualizado.
+ */
 void processar_dois_pontos(AnalisaElemento* elemento) {
     if (*(ponteiroAtualChar + 1) == '=') {
         elemento->tipo = elem_op_relacional; // :=
@@ -331,6 +432,11 @@ void processar_dois_pontos(AnalisaElemento* elemento) {
     }
 }
 
+/**
+ * Processa operadores de soma (+) e subtração (-).
+ * 
+ * @param elemento O ponteiro para o elemento a ser atualizado.
+ */
 void processar_op_soma_mult(AnalisaElemento* elemento) {
     if (*ponteiroAtualChar == '+') {
         elemento->tipo = elem_op_soma;
@@ -340,6 +446,11 @@ void processar_op_soma_mult(AnalisaElemento* elemento) {
     ponteiroAtualChar++;
 }
 
+/**
+ * Identifica um símbolo com base no caractere atual.
+ * 
+ * @return O elemento identificado.
+ */
 AnalisaElemento identifica_simb() {
     AnalisaElemento elemento;
     iniciar_elemento_simb(&elemento);
@@ -369,11 +480,19 @@ AnalisaElemento identifica_simb() {
     return elemento;
 }
 
+/**
+ * Inicializa um elemento genérico.
+ * 
+ * @param elemento O ponteiro para o elemento a ser inicializado.
+ */
 void iniciar_elemento(AnalisaElemento* elemento) {
     elemento->tipo = elem_coment;
     elemento->linha = contadorLinha;
 }
 
+/**
+ * Processa um símbolo maior (>) e opcionalmente verifica se é maior ou igual.
+ */
 void processar_maior() {
     ponteiroAtualChar++;  // Ignora o '>'
     if (*ponteiroAtualChar == '=') {
@@ -381,6 +500,9 @@ void processar_maior() {
     }
 }
 
+/**
+ * Processa um símbolo menor (<) e opcionalmente verifica se é menor ou igual.
+ */
 void processar_menor() {
     ponteiroAtualChar++;  // Ignora o '<'
     if (*ponteiroAtualChar == '=') {
@@ -388,6 +510,11 @@ void processar_menor() {
     }
 }
 
+/**
+ * Identifica e retorna um operador relacional.
+ * 
+ * @return Um objeto AnalisaElemento representando um operador relacional.
+ */
 AnalisaElemento identifica_op_relacional() {
     AnalisaElemento elemento;
     iniciar_elemento(&elemento);
@@ -401,10 +528,19 @@ AnalisaElemento identifica_op_relacional() {
     return elemento;
 }
 
+/**
+ * Ignora o símbolo de abertura de comentário.
+ */
 void ignorar_abertura() {
     ponteiroAtualChar++;  // Ignora o '{'
 }
 
+/**
+ * Conta o número de linhas entre a abertura e o fechamento de um comentário.
+ * 
+ * Esta função percorre o buffer até encontrar o fechamento '}' ou o fim do buffer
+ * e incrementa o contador de linhas sempre que encontra um '\n'.
+ */
 void contar_linhas() {
     while (*ponteiroAtualChar != '}' && *ponteiroAtualChar != '\0') {
         if (*ponteiroAtualChar == '\n') {
@@ -414,6 +550,12 @@ void contar_linhas() {
     }
 }
 
+/**
+ * Ignora o símbolo de fechamento de comentário.
+ * 
+ * @param elemento O ponteiro para o elemento que será atualizado.
+ * @return 1 em caso de sucesso, 0 em caso de erro (comentário não fechado).
+ */
 int ignorar_fechamento(AnalisaElemento* elemento) {
     if (*ponteiroAtualChar == '}') {
         ponteiroAtualChar++;  // Ignora o '}'
@@ -424,6 +566,11 @@ int ignorar_fechamento(AnalisaElemento* elemento) {
     }
 }
 
+/**
+ * Identifica um comentário, contando as linhas e verificando o fechamento.
+ * 
+ * @return O elemento do comentário identificado.
+ */
 AnalisaElemento identifica_coment() {
     AnalisaElemento elemento;
     iniciar_elemento(&elemento);
@@ -434,6 +581,13 @@ AnalisaElemento identifica_coment() {
     return elemento;
 }
 
+/**
+ * Abre um arquivo para leitura.
+ * 
+ * @param nome_arquivo O nome do arquivo a ser aberto.
+ * @return Um ponteiro para o arquivo aberto, ou NULL se houver um erro.
+ */
+
 FILE *abrir_arquivo(const char *nome_arquivo) {
     FILE *arquivo = fopen(nome_arquivo, "r");
     if (!arquivo) {
@@ -443,9 +597,14 @@ FILE *abrir_arquivo(const char *nome_arquivo) {
     return arquivo;
 }
 
-// Função para ler o conteúdo do arquivo em um buffer
+/**
+ * Lê o conteúdo de um arquivo para um buffer.
+ * 
+ * @param arquivo O ponteiro para o arquivo a ser lido.
+ * @return O número de bytes lidos.
+ */
 size_t ler_arquivo(FILE *arquivo) {
-    size_t bytesLidos = fread(bufferFonte, 1, TAMANHO_MAXIMO_BUFFER - 1, arquivo);
+    size_t bytesLidos = fread(bufferFonte, 1, 600 - 1, arquivo);
     bufferFonte[bytesLidos] = '\0';  // Garante que o buffer seja uma string válida
     ponteiroAtualChar = bufferFonte;  // Inicializa o ponteiro para o buffer
     return bytesLidos;
