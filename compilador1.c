@@ -9,22 +9,40 @@ char bufferFonte[TAMANHO_MAXIMO_BUFFER];
 char *ponteiroAtualChar;
 
 typedef enum {
-    ELEM_ERRO,
-    ELEM_IDENTIFICADOR,
-    ELEM_NUMERO,
-    ELEM_PALAVRA_RESERVADA,
-    ELEM_PONTO_VIRGULA,
-    ELEM_ABRE_PAR,
-    ELEM_FECHA_PAR,
-    ELEM_COMENTARIO,
-    ELEM_OP_RELACIONAL,  // Operador relacional (>, <, >=, <=, etc.)
-    ELEM_OP_SOMA,        // Operadores de soma e subtração (+, -)
-    ELEM_OP_MULT,        // Operadores de multiplicação e divisão (*, /)
-    ELEM_VIRGULA,        // Operador de vírgula (,)
-    ELEM_DOIS_PONTOS,    // Operador ":"
-    ELEM_PONTO_FINAL,    // Ponto final "."
-    ELEM_EOF             // Fim do arquivo
+    elem_var,
+    elem_num,
+    elem_reservada,
+    elem_ponto_virgula,
+    elem_abertura,
+    elem_fechamento,
+    elem_coment,
+    elem_op_relacional,
+    elem_op_soma,        
+    elem_op_mult,        
+    elem_virgula,        
+    elem_2_pontos,    
+    elem_ponto,    
+    elem_end,       
 } TipoElemento;
+
+const char *print_elemento[] = {
+    "identificador",
+    "numero",
+    "palavra_reservada",
+    ";",
+    "(",
+    ")",
+    "comentario",
+    "op_relacional",
+    "op_soma",
+    "op_mult",
+    ",",
+    ":",
+    ".",
+    "end",
+};
+
+const char *palavrasReservadas[] = {"program", "begin", "end", "if", "elif", "for", "read", "write", "set", "to", "of", "integer", "boolean"};
 
 typedef struct {
     TipoElemento tipo;
@@ -32,194 +50,213 @@ typedef struct {
     float valorNumerico;
     char identificador[16];
 } AnalisaElemento;
-
-const char *print_elemento[] = {
-    "erro",
-    "identificador",
-    "numero",
-    "palavra_reservada",
-    "ponto_virgula",
-    "abre_parenteses",
-    "fecha_parenteses",
-    "comentario",
-    "op_relacional",
-    "op_soma",
-    "op_mult",
-    "virgula",
-    "dois_pontos",
-    "ponto_final",
-    "fim_do_arquivo"
-};
-
-const char *palavrasReservadas[] = {"program", "begin", "end", "if", "elif", "for", "read", "write", "set", "to", "of", "integer", "boolean"};
-
 int contadorLinha = 1;
 
 AnalisaElemento prox_elemento;
-AnalisaElemento identificar_numero();
-AnalisaElemento obter_proximo_token();
-AnalisaElemento identificar_simbolo();
-AnalisaElemento identificar_comentario();
-AnalisaElemento identificar_identificador();
-AnalisaElemento identificar_operador_relacional();
+AnalisaElemento identifica_num();
+AnalisaElemento obtem_proximo_elemento();
+AnalisaElemento identifica_simb();
+AnalisaElemento identifica_coment();
+AnalisaElemento identifica_var();
+AnalisaElemento identifica_op_relacional();
 
-void analisar_bloco();
-void analisar_comando();
-void analisar_programa();
-void analisar_expressao();
-void analisar_comando_composto();
-void analisar_declaracao_variaveis();
-void consumir_token(TipoElemento esperado);
-void reportar_erro_sintatico(const char *esperado, const char *encontrado, int linha);
+void analisa_bloco();
+void analisa_comando();
+void analisa_programa();
+void analisa_expressao();
+void analisa_comando_if();
+void analisa_comando_for();
+void analisa_comando_read();
+void analisa_comando_write();
+void analisa_comando_composto();
+void analisa_declaracao_variaveis();
+void raise_erro(const char *esperado, const char *encontrado, int linha);
 
-void consumir_token(TipoElemento esperado) {
-    while (prox_elemento.tipo == ELEM_COMENTARIO) {
+void exibir_comentarios() {
+    while (prox_elemento.tipo == elem_coment) {
         printf("# %d: comentario\n", prox_elemento.linha);  // Exibe o comentário
-        prox_elemento = obter_proximo_token();  // Avança para o próximo elemento
+        prox_elemento = obtem_proximo_elemento();  // Avança para o próximo elemento
     }
+}
+
+void exibir_elemento() {
+    if (prox_elemento.tipo == elem_var) {
+        printf("# %d: %s | %s\n", prox_elemento.linha, print_elemento[prox_elemento.tipo], prox_elemento.identificador);
+    } else if (prox_elemento.tipo == elem_reservada) {
+        printf("# %d: %s\n", prox_elemento.linha, prox_elemento.identificador);  // Exibe o nome da palavra reservada
+    } else if (prox_elemento.tipo == elem_num) {
+        printf("# %d: %s | %f\n", prox_elemento.linha, print_elemento[prox_elemento.tipo], prox_elemento.valorNumerico);
+    } else {
+        printf("# %d: %s\n", prox_elemento.linha, print_elemento[prox_elemento.tipo]);
+    }
+}
+
+void consome_elemento(int esperado) {
+    exibir_comentarios(); // Exibe comentários antes do elemento esperado
 
     if (prox_elemento.tipo == esperado) {
-        if (prox_elemento.tipo == ELEM_IDENTIFICADOR) {
-            printf("# %d: %s | %s\n", prox_elemento.linha, print_elemento[prox_elemento.tipo], prox_elemento.identificador);
-        } else if (prox_elemento.tipo == ELEM_PALAVRA_RESERVADA) {
-            printf("# %d: %s\n", prox_elemento.linha, prox_elemento.identificador);  // Exibe o nome da palavra reservada
-        } else if (prox_elemento.tipo == ELEM_NUMERO) {
-            printf("# %d: %s | %f\n", prox_elemento.linha, print_elemento[prox_elemento.tipo], prox_elemento.valorNumerico);
-        } else {
-            printf("# %d: %s\n", prox_elemento.linha, print_elemento[prox_elemento.tipo]);
-        }
-        prox_elemento = obter_proximo_token();  // Avança para o próximo elemento
+        exibir_elemento(); // Exibe o elemento esperado
+        prox_elemento = obtem_proximo_elemento();  // Avança para o próximo elemento
     } else {
-        reportar_erro_sintatico(print_elemento[esperado], print_elemento[prox_elemento.tipo], prox_elemento.linha);
+        raise_erro(print_elemento[esperado], print_elemento[prox_elemento.tipo], prox_elemento.linha);
         exit(1);  // Encerra o programa em caso de erro
     }
 }
 
-void analisar_programa() {
-    consumir_token(ELEM_PALAVRA_RESERVADA);  // "program"
-    consumir_token(ELEM_IDENTIFICADOR);      // Nome do programa
-    consumir_token(ELEM_PONTO_VIRGULA);      // ;
-    analisar_bloco();                         // <bloco>
-    consumir_token(ELEM_PONTO_FINAL);        // Consome o ponto final (.)
+void analisa_programa() {
+    consome_elemento(elem_reservada);  // "program"
+    consome_elemento(elem_var);      // Nome do programa
+    consome_elemento(elem_ponto_virgula);      // ;
+    analisa_bloco();                         // <bloco>
+    consome_elemento(elem_ponto);        // Consome o ponto final (.)
 }
 
-void analisar_bloco() {
-    analisar_declaracao_variaveis();
-    analisar_comando_composto();
+void analisa_bloco() {
+    analisa_declaracao_variaveis();
+    analisa_comando_composto();
 }
 
-void analisar_declaracao_variaveis() {
-    while (prox_elemento.tipo == ELEM_PALAVRA_RESERVADA && 
+void analisa_declaracao_variaveis() {
+    while (prox_elemento.tipo == elem_reservada && 
           (strcmp(prox_elemento.identificador, "integer") == 0 || strcmp(prox_elemento.identificador, "boolean") == 0)) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "integer" ou "boolean"
-        consumir_token(ELEM_IDENTIFICADOR);      // Nome da variável
-        while (prox_elemento.tipo == ELEM_VIRGULA) {
-            consumir_token(ELEM_VIRGULA);        // Consome vírgula
-            consumir_token(ELEM_IDENTIFICADOR);  // Mais identificadores
+        consome_elemento(elem_reservada);  // "integer" ou "boolean"
+        consome_elemento(elem_var);      // Nome da variável
+        while (prox_elemento.tipo == elem_virgula) {
+            consome_elemento(elem_virgula);        // Consome vírgula
+            consome_elemento(elem_var);  // Mais identificadores
         }
-        consumir_token(ELEM_PONTO_VIRGULA);      // ;
+        consome_elemento(elem_ponto_virgula);      // ;
     }
 }
 
-void analisar_comando_composto() {
-    consumir_token(ELEM_PALAVRA_RESERVADA);  // "begin"
-    analisar_comando();
-    while (prox_elemento.tipo == ELEM_PONTO_VIRGULA) {
-        consumir_token(ELEM_PONTO_VIRGULA);  // ;
-        analisar_comando();
+void analisa_comando_composto() {
+    consome_elemento(elem_reservada);  // "begin"
+    analisa_comando();
+    while (prox_elemento.tipo == elem_ponto_virgula) {
+        consome_elemento(elem_ponto_virgula);  // ;
+        analisa_comando();
     }
-    consumir_token(ELEM_PALAVRA_RESERVADA);  // "end"
+    consome_elemento(elem_reservada);  // "end"
 }
 
-void analisar_comando() {
+void analisa_comando() {
     if (strcmp(prox_elemento.identificador, "set") == 0) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "set"
-        consumir_token(ELEM_IDENTIFICADOR);      // Nome da variável
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "to"
-        analisar_expressao();
+        consome_elemento(elem_reservada);  // "set"
+        consome_elemento(elem_var);      // Nome da variável
+        consome_elemento(elem_reservada);  // "to"
+        analisa_expressao();                     // <expressao>
     } else if (strcmp(prox_elemento.identificador, "if") == 0) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "if"
-        analisar_expressao();                     // <expressao>
-        consumir_token(ELEM_DOIS_PONTOS);        // ":"
-        analisar_comando();                       // <comando>
-        if (strcmp(prox_elemento.identificador, "elif") == 0) {
-            consumir_token(ELEM_PALAVRA_RESERVADA);  // "elif"
-            analisar_comando();                       // <comando>
-        }
+        analisa_comando_if(); // Função auxiliar para o comando "if"
     } else if (strcmp(prox_elemento.identificador, "for") == 0) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "for"
-        consumir_token(ELEM_IDENTIFICADOR);      // Identificador
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "of"
-        analisar_expressao();                     // <expressao>
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "to"
-        analisar_expressao();                     // <expressao>
-        consumir_token(ELEM_DOIS_PONTOS);        // ":"
-        analisar_comando();                       // <comando>
+        analisa_comando_for(); // Função auxiliar para o comando "for"
     } else if (strcmp(prox_elemento.identificador, "read") == 0) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "read"
-        consumir_token(ELEM_ABRE_PAR);           // (
-        consumir_token(ELEM_IDENTIFICADOR);      // Identificador
-        while (prox_elemento.tipo == ELEM_VIRGULA) {
-            consumir_token(ELEM_VIRGULA);        // Consome a vírgula
-            consumir_token(ELEM_IDENTIFICADOR);  // Próximo identificador
-        }
-        consumir_token(ELEM_FECHA_PAR);          // )
+        analisa_comando_read(); // Função auxiliar para o comando "read"
     } else if (strcmp(prox_elemento.identificador, "write") == 0) {
-        consumir_token(ELEM_PALAVRA_RESERVADA);  // "write"
-        consumir_token(ELEM_ABRE_PAR);           // (
-        analisar_expressao();                     // <expressao>
-        while (prox_elemento.tipo == ELEM_VIRGULA) {
-            consumir_token(ELEM_VIRGULA);        // Consome a vírgula
-            analisar_expressao();                 // Próxima expressão
-        }
-        consumir_token(ELEM_FECHA_PAR);          // )
+        analisa_comando_write(); // Função auxiliar para o comando "write"
     }
 }
 
-void analisar_expressao() {
-    // Implementação simplificada de análise de expressão
-    consumir_token(ELEM_IDENTIFICADOR);  // Exemplo de elemento esperado
+void analisa_comando_if() {
+    consome_elemento(elem_reservada);  // "if"
+    analisa_expressao();                     // <expressao>
+    consome_elemento(elem_2_pontos);        // ":"
+    analisa_comando();                       // <comando>
+    if (strcmp(prox_elemento.identificador, "elif") == 0) {
+        consome_elemento(elem_reservada);  // "elif"
+        analisa_comando();                       // <comando>
+    }
 }
 
-void reportar_erro_sintatico(const char *esperado, const char *encontrado, int linha) {
+void analisa_comando_for() {
+    consome_elemento(elem_reservada);  // "for"
+    consome_elemento(elem_var);      // Identificador
+    consome_elemento(elem_reservada);  // "of"
+    analisa_expressao();                     // <expressao>
+    consome_elemento(elem_reservada);  // "to"
+    analisa_expressao();                     // <expressao>
+    consome_elemento(elem_2_pontos);        // ":"
+    analisa_comando();                       // <comando>
+}
+
+void analisa_comando_read() {
+    consome_elemento(elem_reservada);  // "read"
+    consome_elemento(elem_abertura);           // (
+    consome_elemento(elem_var);      // Identificador
+    while (prox_elemento.tipo == elem_virgula) {
+        consome_elemento(elem_virgula);        // Consome a vírgula
+        consome_elemento(elem_var);  // Próximo identificador
+    }
+    consome_elemento(elem_fechamento);          // )
+}
+
+void analisa_comando_write() {
+    consome_elemento(elem_reservada);  // "write"
+    consome_elemento(elem_abertura);           // (
+    analisa_expressao();                     // <expressao>
+    while (prox_elemento.tipo == elem_virgula) {
+        consome_elemento(elem_virgula);        // Consome a vírgula
+        analisa_expressao();                 // Próxima expressão
+    }
+    consome_elemento(elem_fechamento);          // )
+}
+
+void analisa_expressao() {
+    // Implementação simplificada de análise de expressão
+    consome_elemento(elem_var);  // Exemplo de elemento esperado
+}
+
+void raise_erro(const char *esperado, const char *encontrado, int linha) {
     printf("Erro sintatico na linha %d: esperado '%s', encontrado '%s'.\n", linha, esperado, encontrado);
 }
 
-AnalisaElemento obter_proximo_token() {
-    AnalisaElemento elemento;
-    elemento.linha = contadorLinha;
-    elemento.tipo = ELEM_ERRO;
-
-    // Ignorar espaços em branco, quebras de linha e tabulações
-    while (*ponteiroAtualChar == ' ' || *ponteiroAtualChar == '\t' || *ponteiroAtualChar == '\n' || *ponteiroAtualChar == '\r') {
+void ignorar_espacos() {
+    while (*ponteiroAtualChar == ' ' || *ponteiroAtualChar == '\t' || 
+           *ponteiroAtualChar == '\n' || *ponteiroAtualChar == '\r') {
         if (*ponteiroAtualChar == '\n') {
             contadorLinha++;
         }
         ponteiroAtualChar++;
     }
-
-    if (*ponteiroAtualChar == '\0') {
-        elemento.tipo = ELEM_EOF;
-        return elemento;  // Fim do arquivo
-    }
-
-    // Identifica palavras reservadas ou identificadores
-    if (isalpha(*ponteiroAtualChar)) {
-        return identificar_identificador();
-    }
-
-    // Identifica números
-    if (isdigit(*ponteiroAtualChar)) {
-        return identificar_numero();
-    }
-
-    // Identifica operadores ou símbolos
-    return identificar_simbolo();
 }
 
-AnalisaElemento identificar_identificador() {
+int verifica_fim_arquivo(AnalisaElemento* elemento) {
+    if (*ponteiroAtualChar == '\0') {
+        elemento->tipo = elem_end;
+        return 1; // Indica que é o fim do arquivo
+    }
+    return 0; // Não é o fim do arquivo
+}
+
+AnalisaElemento identifica_elemento() {
     AnalisaElemento elemento;
-    elemento.tipo = ELEM_IDENTIFICADOR;
+    elemento.linha = contadorLinha;
+    elemento.tipo = elem_end; // Inicializa como erro
+
+    if (isalpha(*ponteiroAtualChar)) {
+        return identifica_var(); // Identifica variáveis ou palavras reservadas
+    }
+
+    if (isdigit(*ponteiroAtualChar)) {
+        return identifica_num(); // Identifica números
+    }
+
+    return identifica_simb(); // Identifica operadores ou símbolos
+}
+
+AnalisaElemento obtem_proximo_elemento() {
+    AnalisaElemento elemento;
+    ignorar_espacos(); // Ignora espaços em branco
+
+    if (verifica_fim_arquivo(&elemento)) {
+        return elemento; // Retorna se for o fim do arquivo
+    }
+
+    return identifica_elemento(); // Identifica o próximo elemento
+}
+
+AnalisaElemento identifica_var() {
+    AnalisaElemento elemento;
+    elemento.tipo = elem_var;
     elemento.linha = contadorLinha;
 
     int i = 0;
@@ -236,7 +273,7 @@ AnalisaElemento identificar_identificador() {
     
     for (size_t j = 0; j < quantidadeReservadas; j++) {
         if (strcmp(elemento.identificador, palavrasReservadas[j]) == 0) {
-            elemento.tipo = ELEM_PALAVRA_RESERVADA;
+            elemento.tipo = elem_reservada;
             break;
         }
     }
@@ -244,9 +281,9 @@ AnalisaElemento identificar_identificador() {
     return elemento;
 }
 
-AnalisaElemento identificar_numero() {
+AnalisaElemento identifica_num() {
     AnalisaElemento elemento;
-    elemento.tipo = ELEM_NUMERO;
+    elemento.tipo = elem_num;
     elemento.linha = contadorLinha;
 
     char numeroStr[16];
@@ -263,124 +300,173 @@ AnalisaElemento identificar_numero() {
     return elemento;
 }
 
-AnalisaElemento identificar_simbolo() {
-    AnalisaElemento elemento;
-    elemento.linha = contadorLinha;
+void iniciar_elemento_simb(AnalisaElemento* elemento) {
+    elemento->linha = contadorLinha;
+}
 
-    switch (*ponteiroAtualChar) {
-        case ';':
-            elemento.tipo = ELEM_PONTO_VIRGULA;
-            ponteiroAtualChar++;
-            break;
-        case ',':
-            elemento.tipo = ELEM_VIRGULA;
-            ponteiroAtualChar++;
-            break;
-        case '(':
-            elemento.tipo = ELEM_ABRE_PAR;
-            ponteiroAtualChar++;
-            break;
-        case ')':
-            elemento.tipo = ELEM_FECHA_PAR;
-            ponteiroAtualChar++;
-            break;
-        case ':':
-            if (*(ponteiroAtualChar + 1) == '=') {
-                elemento.tipo = ELEM_OP_RELACIONAL;  // :=
-                ponteiroAtualChar += 2;
-            } else {
-                elemento.tipo = ELEM_DOIS_PONTOS;
-                ponteiroAtualChar++;
-            }
-            break;
-        case '.':
-            elemento.tipo = ELEM_PONTO_FINAL;
-            ponteiroAtualChar++;
-            break;
-        case '+':
-        case '-':
-            elemento.tipo = ELEM_OP_SOMA;
-            ponteiroAtualChar++;
-            break;
-        case '*':
-        case '/':
-            elemento.tipo = ELEM_OP_MULT;
-            ponteiroAtualChar++;
-            break;
-        case '>':
-        case '<':
-            return identificar_operador_relacional();
-        case '{':
-            return identificar_comentario();
-        default:
-            elemento.tipo = ELEM_ERRO;
-            ponteiroAtualChar++;  // Avança para ignorar caractere não reconhecido
+void processar_simbolo_unario(AnalisaElemento* elemento) {
+    if (*ponteiroAtualChar == ';') {
+        elemento->tipo = elem_ponto_virgula;
+    } else if (*ponteiroAtualChar == ',') {
+        elemento->tipo = elem_virgula;
+    } else if (*ponteiroAtualChar == '(') {
+        elemento->tipo = elem_abertura;
+    } else if (*ponteiroAtualChar == ')') {
+        elemento->tipo = elem_fechamento;
+    } else if (*ponteiroAtualChar == '.') {
+        elemento->tipo = elem_ponto;
+    } else {
+        elemento->tipo = elem_end; // Caractere não reconhecido
+    }
+    ponteiroAtualChar++; // Avança o ponteiro
+}
+
+void processar_dois_pontos(AnalisaElemento* elemento) {
+    if (*(ponteiroAtualChar + 1) == '=') {
+        elemento->tipo = elem_op_relacional; // :=
+        ponteiroAtualChar += 2; // Avança dois caracteres
+    } else {
+        elemento->tipo = elem_2_pontos;
+        ponteiroAtualChar++; // Avança um caractere
+    }
+}
+
+void processar_op_soma_mult(AnalisaElemento* elemento) {
+    if (*ponteiroAtualChar == '+') {
+        elemento->tipo = elem_op_soma;
+    } else if (*ponteiroAtualChar == '-') {
+        elemento->tipo = elem_op_soma; // Considera ambos como soma
+    }
+    ponteiroAtualChar++;
+}
+
+AnalisaElemento identifica_simb() {
+    AnalisaElemento elemento;
+    iniciar_elemento_simb(&elemento);
+
+    if (*ponteiroAtualChar == ';' || *ponteiroAtualChar == ',' || *ponteiroAtualChar == '(' || 
+        *ponteiroAtualChar == ')' || *ponteiroAtualChar == '.') {
+        processar_simbolo_unario(&elemento);
+    } else if (*ponteiroAtualChar == ':') {
+        processar_dois_pontos(&elemento);
+    } else if (*ponteiroAtualChar == '+' || *ponteiroAtualChar == '-') {
+        processar_op_soma_mult(&elemento);
+    } else if (*ponteiroAtualChar == '*') {
+        elemento.tipo = elem_op_mult;
+        ponteiroAtualChar++;
+    } else if (*ponteiroAtualChar == '/') {
+        elemento.tipo = elem_op_mult; // Se preferir pode criar uma função específica para operador de divisão
+        ponteiroAtualChar++;
+    } else if (*ponteiroAtualChar == '>' || *ponteiroAtualChar == '<') {
+        return identifica_op_relacional();
+    } else if (*ponteiroAtualChar == '{') {
+        return identifica_coment();
+    } else {
+        elemento.tipo = elem_end;
+        ponteiroAtualChar++; // Ignora caractere não reconhecido
     }
 
     return elemento;
 }
 
-AnalisaElemento identificar_operador_relacional() {
+void iniciar_elemento(AnalisaElemento* elemento) {
+    elemento->tipo = elem_coment;
+    elemento->linha = contadorLinha;
+}
+
+void processar_maior() {
+    ponteiroAtualChar++;  // Ignora o '>'
+    if (*ponteiroAtualChar == '=') {
+        ponteiroAtualChar++;  // Ignora o '='
+    }
+}
+
+void processar_menor() {
+    ponteiroAtualChar++;  // Ignora o '<'
+    if (*ponteiroAtualChar == '=') {
+        ponteiroAtualChar++;  // Ignora o '='
+    }
+}
+
+AnalisaElemento identifica_op_relacional() {
     AnalisaElemento elemento;
-    elemento.tipo = ELEM_OP_RELACIONAL;
-    elemento.linha = contadorLinha;
+    iniciar_elemento(&elemento);
 
     if (*ponteiroAtualChar == '>') {
-        ponteiroAtualChar++;
-        if (*ponteiroAtualChar == '=') {
-            ponteiroAtualChar++;
-        }
+        processar_maior();
     } else if (*ponteiroAtualChar == '<') {
-        ponteiroAtualChar++;
-        if (*ponteiroAtualChar == '=') {
-            ponteiroAtualChar++;
-        }
+        processar_menor();
     }
 
     return elemento;
 }
 
-AnalisaElemento identificar_comentario() {
-    AnalisaElemento elemento;
-    elemento.tipo = ELEM_COMENTARIO;
-    elemento.linha = contadorLinha;
-
+void ignorar_abertura() {
     ponteiroAtualChar++;  // Ignora o '{'
+}
 
+void contar_linhas() {
     while (*ponteiroAtualChar != '}' && *ponteiroAtualChar != '\0') {
         if (*ponteiroAtualChar == '\n') {
             contadorLinha++;
         }
         ponteiroAtualChar++;
     }
+}
 
+int ignorar_fechamento(AnalisaElemento* elemento) {
     if (*ponteiroAtualChar == '}') {
         ponteiroAtualChar++;  // Ignora o '}'
+        return 1;  // Sucesso
     } else {
-        elemento.tipo = ELEM_ERRO;  // Erro: Comentário não fechado
+        elemento->tipo = elem_end;  // Erro: Comentário não fechado
+        return 0;  // Erro
     }
+}
+
+AnalisaElemento identifica_coment() {
+    AnalisaElemento elemento;
+    iniciar_elemento(&elemento);
+    ignorar_abertura();
+    contar_linhas();
+    ignorar_fechamento(&elemento);
 
     return elemento;
 }
 
-int main(int argc, char *argv[]) {
-    // if (argc < 2) {
-    //     printf("Uso: %s <arquivo_fonte>\n", argv[0]);
-    //     return 1;
-    // }
+FILE *abrir_arquivo(const char *nome_arquivo) {
+    FILE *arquivo = fopen(nome_arquivo, "r");
+    if (!arquivo) {
+        printf("Erro ao abrir o arquivo: %s\n", nome_arquivo);
+        return NULL;
+    }
+    return arquivo;
+}
 
-    FILE *arquivo = fopen("teste2.pas", "r");
+// Função para ler o conteúdo do arquivo em um buffer
+size_t ler_arquivo(FILE *arquivo) {
+    size_t bytesLidos = fread(bufferFonte, 1, TAMANHO_MAXIMO_BUFFER - 1, arquivo);
+    bufferFonte[bytesLidos] = '\0';  // Garante que o buffer seja uma string válida
+    ponteiroAtualChar = bufferFonte;  // Inicializa o ponteiro para o buffer
+    return bytesLidos;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        printf("Uso: %s <arquivo_fonte>\n", argv[0]);
+        return 1;
+    }
+
+    FILE *arquivo = abrir_arquivo(argv[1]);
     if (!arquivo) {
         printf("Erro ao abrir o arquivo: %s\n", "teste1.pas");
         return 1;
     }
 
-    size_t bytesLidos = fread(bufferFonte, 1, TAMANHO_MAXIMO_BUFFER - 1, arquivo);
-    bufferFonte[bytesLidos] = '\0';  // Garante que o buffer seja uma string válida
-    ponteiroAtualChar = bufferFonte;  // Inicializa o ponteiro para o buffer
+    ler_arquivo(arquivo);
 
-    prox_elemento = obter_proximo_token();  // Obtém o primeiro elemento
-    analisar_programa();                   // Inicia a análise sintática
+    prox_elemento = obtem_proximo_elemento();  // Obtém o primeiro elemento
+    analisa_programa();                   // Inicia a análise sintática
 
     return 0;
 }
