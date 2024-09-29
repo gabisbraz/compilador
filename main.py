@@ -1,281 +1,236 @@
-with open("teste1.pas", "r") as arquivo:
-    linhas = arquivo.readlines()
-    string = "".join(linhas)
+# Função para verificar se a linha contém um comentário
+def analisar_comentario(linha):
+    if "{-" in linha:  # Comentário multilinha completo
+        return "{- comentario", len(linha)
+    elif "#" in linha:  # Comentário de uma linha
+        return "# comentario", len(linha)
+    return False, 0  # Não é um comentário
 
 
-def gera_lista(delimitadores, string):
-    temp = ""
-    resultado = []
-    i = 0
-    while i < len(string):
-        for delimitador in delimitadores:
-            if string[i : i + len(delimitador)] == delimitador:
-                if temp:
-                    resultado.append(temp.strip())
-                    temp = ""
-                if delimitador != " ":
-                    resultado.append(delimitador)
-                i += len(delimitador) - 1
-                break
-        else:
-            temp += string[i]
-        i += 1
-    if temp:
-        resultado.append(temp.strip())
-    return resultado
+# Função para analisar o início do programa
+def analisar_programa(linha, num_linha):
+    if "program " in linha:
+        # Encontrar o espaço após 'program'
+        pos = linha.find("program ") + len("program ")
+        if pos < len(linha):
+            # Encontrar o próximo espaço ou ';'
+            fim_identificador = linha.find(";", pos)
+            if fim_identificador != -1:
+                identificador = linha[pos:fim_identificador].strip()
+                print(f"# {num_linha}: program")
+                print(f"# {num_linha}: identificador | {identificador}")
+                print(f"# {num_linha}: ;")
+                return True
+    return False
 
 
-def gera_matriz(resultado: list):
-    resultado_matriz = []
-    linha_atual = []
-    for token in resultado:
-        if token == "\n":
-            if linha_atual:
-                resultado_matriz.append(linha_atual)
-                linha_atual = []
-        else:
-            linha_atual.append(token)
-    if linha_atual:
-        resultado_matriz.append(linha_atual)
-    return resultado_matriz
+# Função para analisar declaração de variáveis
+def analisar_declaracao_de_variaveis(linha, num_linha):
+    if linha.startswith("integer ") or linha.startswith("boolean "):
+        tipo = linha[: linha.find(" ")].strip()  # Tipo: 'integer' ou 'boolean'
+        variaveis_str = linha[linha.find(" ") + 1 : linha.find(";")].strip()
+        variaveis_lista = [v.strip() for v in variaveis_str.split(",")]
+
+        print(f"# {num_linha}: {tipo}")
+        for i, var in enumerate(variaveis_lista):
+            print(f"# {num_linha}: identificador | {var.strip()}")
+            if i != len(variaveis_lista) - 1:
+                print(f"# {num_linha}: ,")
+        print(f"# {num_linha}: ;")
+        return True
+    return False
 
 
-class AnalisadorSintatico:
-    def __init__(self, matriz):
-        self.matriz = matriz
-        self.indice_linha = 0
-        self.indice_token = 0
-        self.token_atual = self.obter_token_atual()
+# Função para analisar comandos compostos
+def analisar_comando_composto(linha, num_linha):
+    if linha == "begin":
+        print(f"# {num_linha}: begin")
+        return True
+    elif linha == "end.":
+        print(f"# {num_linha}: end")
+        print(f"# {num_linha}: .")
+        return True
+    return False
 
-    def obter_token_atual(self):
-        if self.indice_linha < len(self.matriz):
-            if self.indice_token < len(self.matriz[self.indice_linha]):
-                return self.matriz[self.indice_linha][self.indice_token]
-        return None
 
-    def avancar(self):
-        self.indice_token += 1
-        if self.indice_token >= len(self.matriz[self.indice_linha]):
-            self.indice_linha += 1
-            self.indice_token = 0
-        self.token_atual = self.obter_token_atual()
+# Função para analisar comandos (geral)
+def analisar_comando(linha, num_linha):
+    linha = linha.strip()
 
-    def imprimir_token(self):
-        if self.token_atual is not None:
-            if self.token_atual == "identificador":
-                # O próximo item deve ser o nome do identificador
-                if self.indice_token + 1 < len(self.matriz[self.indice_linha]):
-                    nome_identificador = self.matriz[self.indice_linha][
-                        self.indice_token + 1
-                    ]
-                    print(
-                        f"# {self.indice_linha + 1}: {self.token_atual} | {nome_identificador}"
-                    )
-                    self.avancar()  # Avança para o próximo token (nome do identificador)
-                self.avancar()  # Avança para o próximo token
+    # Verifica se há um comentário no final da linha
+    comentario = ""
+    if "#" in linha:
+        linha, comentario = linha.split("#", 1)
+        comentario = comentario.strip()
+
+    # Comando de atribuição: set identificador to expressão
+    if "set " in linha:
+        pos_set = linha.find("set ") + len("set ")
+        pos_to = linha.find("to", pos_set)
+        pos_ponto_e_virgula = linha.find(";", pos_to)
+
+        if pos_to != -1 and pos_ponto_e_virgula != -1:
+            identificador1 = linha[pos_set:pos_to].strip()
+            identificador2 = linha[pos_to + len("to") : pos_ponto_e_virgula].strip()
+            print(f"# {num_linha}: set")
+            print(f"# {num_linha}: identificador | {identificador1}")
+            print(f"# {num_linha}: to")
+            print(f"# {num_linha}: identificador | {identificador2}")
+            print(f"# {num_linha}: ;")
+
+            if comentario:
+                print(f"# {num_linha}: comentario")
+            return True
+
+    # Comando condicional: if expressão :
+    if "if " in linha and linha.strip().endswith(":"):
+        pos_if = linha.find("if ") + len("if ")
+        condicao = linha[pos_if:-1].strip()  # Remove 'if ' e ':'
+        print(f"# {num_linha}: if")
+        for cond in condicao.split():
+            if cond.isidentifier():  # Verifica se é um identificador
+                print(f"# {num_linha}: identificador | {cond}")
             else:
-                print(f"# {self.indice_linha + 1}: {self.token_atual}")
+                print(f"# {num_linha}: {cond}")
+        print(f"# {num_linha}: :")
 
-    def espera(self, token_esperado):
-        if self.token_atual == token_esperado:
-            self.imprimir_token()
-            self.avancar()
-        else:
-            self.erro_sintatico(token_esperado)
+        if comentario:
+            print(f"# {num_linha}: comentario")
+        return True
 
-    def erro_sintatico(self, token_esperado):
-        linha = self.indice_linha + 1
-        print(
-            f"# {linha}: erro sintatico, esperado [{token_esperado}] encontrado [{self.token_atual}]"
-        )
-        raise Exception("Análise interrompida devido a erro de sintaxe.")
+    # Comando de repetição: for identificador of expressão to expressão :
+    if "for " in linha and linha.strip().endswith(":"):
+        pos_for = linha.find("for ") + len("for ")
+        pos_of = linha.find("of", pos_for)
+        pos_to = linha.find("to", pos_of)
 
-    def analisar_programa(self):
-        self.espera("program")  # Espera a palavra-chave 'program'
-        # Aqui, após 'program', aceitamos qualquer identificador
-        if self.token_atual:
-            self.imprimir_token()  # Imprime o nome do programa
-            self.avancar()  # Avança para o próximo token
-        else:
-            self.erro_sintatico("identificador")
+        if pos_of != -1 and pos_to != -1:
+            print(f"# {num_linha}: for")
+            identificador = linha[pos_for:pos_of].strip()
+            print(f"# {num_linha}: identificador | {identificador}")
+            print(f"# {num_linha}: of")
+            print(f"# {num_linha}: expressão")
+            print(f"# {num_linha}: to")
+            print(f"# {num_linha}: expressão")
+            print(f"# {num_linha}: :")
 
-        self.espera(";")  # Espera o ponto e vírgula
-        self.analisar_bloco()  # Analisa o bloco de código
-        self.espera(".")  # Espera o ponto final
+            if comentario:
+                print(f"# {num_linha}: comentario")
+            return True
 
-    def analisar_bloco(self):
-        self.analisar_declaracao_de_variaveis()
-        self.analisar_comando_composto()
+    # Comando de entrada: read(lista_variaveis)
+    if "read(" in linha and ";" in linha:
+        print(f"# {num_linha}: read")
+        print(f"# {num_linha}: (")
+        inicio_lista = linha.find("read(") + len("read(")
+        fim_lista = linha.find(";", inicio_lista)
 
-    def analisar_declaracao_de_variaveis(self):
-        while self.token_atual in ["integer", "boolean"]:
-            self.analisar_tipo()
-            self.analisar_lista_variavel()
-            self.espera(";")
+        lista_variaveis = linha[inicio_lista:fim_lista].strip()  # Remove 'read(' e ';'
+        variaveis = [v.strip() for v in lista_variaveis.split(",")]
+        for var in variaveis:
+            print(f"# {num_linha}: identificador | {var}")
+        print(f"# {num_linha}: )")
+        print(f"# {num_linha}: ;")
 
-    def analisar_tipo(self):
-        if self.token_atual == "integer":
-            self.avancar()
-        elif self.token_atual == "boolean":
-            self.avancar()
-        else:
-            self.erro_sintatico("tipo")
+        if comentario:
+            print(f"# {num_linha}: comentario")
+        return True
 
-    def analisar_lista_variavel(self):
-        self.espera("identificador")  # Espera o primeiro identificador
-        while self.token_atual == ",":
-            self.avancar()
-            self.espera("identificador")  # Espera identificadores adicionais
+    # Comando de saída: write(expressao)
+    if "write(" in linha and ")" in linha:
+        print(f"# {num_linha}: write")
+        print(f"# {num_linha}: (")
+        inicio_expressao = linha.find("write(") + len("write(")
+        fim_expressao = linha.find(")", inicio_expressao)
 
-    def analisar_comando_composto(self):
-        self.espera("begin")
-        self.analisar_comando()
-        while self.token_atual == ";":
-            self.avancar()
-            self.analisar_comando()
-        self.espera("end")
+        expressao = linha[
+            inicio_expressao:fim_expressao
+        ].strip()  # Remove 'write(' e ')'
+        print(f"# {num_linha}: expressão | {expressao}")
+        print(f"# {num_linha}: )")
 
-    def analisar_comando(self):
-        if self.token_atual == "set":
-            self.analisar_comando_atribuicao()
-        elif self.token_atual == "if":
-            self.analisar_comando_condicional()
-        elif self.token_atual == "for":
-            self.analisar_comando_repeticao()
-        elif self.token_atual == "read":
-            self.analisar_comando_entrada()
-        elif self.token_atual == "write":
-            self.analisar_comando_saida()
-        elif self.token_atual == "begin":
-            self.analisar_comando_composto()
-        else:
-            self.erro_sintatico("comando")
+        if comentario:
+            print(f"# {num_linha}: comentario")
+        return True
 
-    def analisar_comando_atribuicao(self):
-        self.espera("set")
-        self.espera("identificador")  # Espera um identificador como variável
-        self.espera("to")
-        self.analisar_expressao()
-
-    def analisar_comando_condicional(self):
-        self.espera("if")
-        self.analisar_expressao()
-        self.espera(":")
-        self.analisar_comando()
-        if self.token_atual == "elif":
-            self.avancar()
-            self.analisar_comando()
-
-    def analisar_comando_repeticao(self):
-        self.espera("for")
-        self.espera("identificador")  # Espera um identificador para a variável do loop
-        self.espera("of")
-        self.analisar_expressao()
-        self.espera("to")
-        self.analisar_expressao()
-        self.espera(":")
-        self.analisar_comando()
-
-    def analisar_comando_entrada(self):
-        self.espera("read")
-        self.espera("(")
-        self.analisar_lista_variavel()
-        self.espera(")")
-
-    def analisar_comando_saida(self):
-        self.espera("write")
-        self.espera("(")
-        self.analisar_expressao()
-        while self.token_atual == ",":
-            self.avancar()
-            self.analisar_expressao()
-        self.espera(")")
-
-    def analisar_expressao(self):
-        self.analisar_expressao_logica()
-        while self.token_atual == "or":
-            self.avancar()
-            self.analisar_expressao_logica()
-
-    def analisar_expressao_logica(self):
-        self.analisar_expressao_relacional()
-        while self.token_atual == "and":
-            self.avancar()
-            self.analisar_expressao_relacional()
-
-    def analisar_expressao_relacional(self):
-        self.analisar_expressao_simples()
-        if self.token_atual in ["<", "<=", "=", "/=", ">", ">="]:
-            self.avancar()
-            self.analisar_expressao_simples()
-
-    def analisar_expressao_simples(self):
-        self.analisar_termo()
-        while self.token_atual in ["+", "−"]:
-            self.avancar()
-            self.analisar_termo()
-
-    def analisar_termo(self):
-        self.analisar_fator()
-        while self.token_atual in ["*", "/"]:
-            self.avancar()
-            self.analisar_fator()
-
-    def analisar_fator(self):
-        if self.token_atual == "identificador":  # Identificadores válidos
-            self.imprimir_token()  # Chama a impressão do identificador
-            self.avancar()
-        elif self.token_atual == "numero":  # Números válidos
-            self.imprimir_token()  # Chama a impressão do número
-            self.avancar()
-        elif self.token_atual in ["true", "false"]:  # Booleanos
-            self.imprimir_token()  # Chama a impressão do booleano
-            self.avancar()
-        elif self.token_atual == "not":
-            self.avancar()
-            self.analisar_fator()
-        elif self.token_atual == "(":
-            self.avancar()
-            self.analisar_expressao()
-            self.espera(")")  # Espera fechar parêntese
-        else:
-            self.erro_sintatico("fator")
-
-    def analisar(self):
-        self.analisar_programa()
-        if self.token_atual is not None:
-            raise Exception("Erro de sintaxe: tokens restantes não processados.")
+    return False
 
 
-resultado = gera_lista(
-    delimitadores=[
-        ";",
-        ".",
-        "(",
-        ")",
-        "{",
-        "}",
-        ":",
-        "<=",
-        "<",
-        "/=",
-        "=",
-        ">=",
-        ">",
-        "+",
-        "−",
-        "*",
-        "/",
-        " ",
-        "\n",
-    ],
-    string=string,
-)
-matriz = gera_matriz(resultado)
-analisador = AnalisadorSintatico(matriz)
-print(matriz)
-try:
-    analisador.analisar()
-    print("Análise sintática bem-sucedida!")
-except Exception as e:
-    print(e)
+# Função para analisar operadores relacionais
+def analisar_operador_relacional(linha, num_linha):
+    operadores = ["<", "<=", "=", "/=", ">", ">="]
+    for operador in operadores:
+        if operador in linha:
+            print(f"# {num_linha}: operador_relacional | {operador}")
+            return True
+    return False
+
+
+# Função para analisar fatores
+def analisar_fator(linha, num_linha):
+    fatores = linha.split()
+    for fator in fatores:
+        if fator.isidentifier() or fator.isdigit() or fator in ["true", "false"]:
+            print(f"# {num_linha}: {fator}")
+            return True
+        elif fator.startswith("(") and fator.endswith(")"):
+            print(f"# {num_linha}: {fator}")
+            return True
+    return False
+
+
+# Função principal para analisar o arquivo
+def analisar_arquivo(arquivo):
+    with open(arquivo, "r") as f:
+        linhas = f.readlines()
+
+    dentro_bloco = False
+    dentro_comentario_multilinha = False
+    comentario_buffer = ""
+
+    for num_linha, linha in enumerate(linhas, start=1):
+        linha = linha.strip()
+
+        # Analisa cada parte da gramática conforme a linha lida
+        if "program " in linha:
+            if analisar_programa(linha, num_linha):
+                continue
+        elif "integer " in linha or "boolean " in linha:
+            if analisar_declaracao_de_variaveis(linha, num_linha):
+                continue
+        elif linha == "begin":
+            dentro_bloco = True
+            analisar_comando_composto(linha, num_linha)
+        elif linha == "end.":
+            analisar_comando_composto(linha, num_linha)
+            dentro_bloco = False
+        elif dentro_bloco:
+            if analisar_comando(linha, num_linha):
+                continue
+            elif analisar_operador_relacional(linha, num_linha):
+                continue
+            else:
+                print(f"Erro sintático na linha {num_linha}: {linha}")
+
+        # Se estamos dentro de um comentário multilinha
+        if dentro_comentario_multilinha:
+            comentario_buffer += linha + " "
+            if "-}" in linha:
+                dentro_comentario_multilinha = False
+                print(f"# {num_linha}: comentario")
+            continue
+
+        # Ignorar comentários no início ou no meio do código
+        comentario, tamanho_comentario = analisar_comentario(linha)
+        if comentario:
+            if "{-" in linha and not linha.count("-}") > 0:
+                dentro_comentario_multilinha = True
+                comentario_buffer = linha + " "
+                continue
+            else:
+                print(f"# {num_linha}: comentario")
+                continue
+
+
+# Exemplo de execução
+analisar_arquivo("teste1.pas")
